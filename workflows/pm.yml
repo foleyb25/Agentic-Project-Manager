@@ -1,10 +1,14 @@
-# PM agent workflow — copy this file into YOUR PROJECT repo at
-# .github/workflows/pm.yml (the project that contains AgenticProjectManager
-# as a submodule). Secrets needed: ANTHROPIC_API_KEY, plus SUPABASE_URL +
-# SUPABASE_SERVICE_KEY for the supabase ledger backend.
+# PM agent workflow — copy into YOUR PROJECT repo at .github/workflows/pm.yml
+# (the project that contains AgenticProjectManager as a submodule).
 #
-# Comment bodies are never interpolated into shell/prompt text (the PM reads
-# them from the prefetched run context) — avoids prompt/shell injection.
+# Secrets: ANTHROPIC_API_KEY, GITHUB_MCP_TOKEN (a PAT with issues read/write —
+# the hosted GitHub MCP does NOT accept the Actions GITHUB_TOKEN),
+# SUPABASE_ACCESS_TOKEN (management PAT) + SUPABASE_PROJECT_REF.
+#
+# The PM is the main Claude Code process running the plugin's /pm-run skill;
+# role agents, hooks, and MCP servers all load from the plugin directory.
+# Comment bodies are never interpolated into the prompt (the PM fetches them
+# by id through the GitHub MCP) — avoids prompt/shell injection.
 
 name: pm-agent
 
@@ -27,7 +31,7 @@ concurrency:
 
 permissions:
   contents: read
-  issues: write
+  issues: write # only used if a skill falls back to gh; MCP writes use the PAT
 
 jobs:
   pm:
@@ -45,42 +49,24 @@ jobs:
           lfs: false # consultations read code, not binary assets
           fetch-depth: 1
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm install -g @anthropic-ai/claude-code
-
-      - uses: astral-sh/setup-uv@v5
-
-      # jsonfile ledger backend only: persist .apm/ across runs.
-      # (Delete this block when using the supabase backend.)
-      # - uses: actions/cache@v4
-      #   with:
-      #     path: AgenticProjectManager/.apm
-      #     key: apm-ledger-${{ github.run_id }}
-      #     restore-keys: apm-ledger-
-
       - name: PM run
-        working-directory: AgenticProjectManager
+        uses: anthropics/claude-code-action@v1
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          # mcp tool surface (pm.tool_surface: mcp) — extra secrets:
-          # a PAT for the hosted GitHub MCP (Actions GITHUB_TOKEN won't auth it)
-          # and a Supabase management PAT + project ref for the Supabase MCP
           GITHUB_MCP_TOKEN: ${{ secrets.GITHUB_MCP_TOKEN }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-          # APM_LEDGER_BACKEND: jsonfile   # override without a config edit
-          # APM_TOOL_SURFACE: cli          # force surface without a config edit
-        run: |
-          uv sync --frozen
-          uv run apm run \
-            --trigger "${{ github.event_name == 'schedule' && 'schedule' || github.event_name == 'issue_comment' && 'issue_comment' || 'workflow_dispatch' }}" \
-            --run-id "pm-${{ github.run_id }}" \
-            --comment-id "${{ github.event.comment.id || '' }}" \
-            --issue-number "${{ github.event.issue.number || '' }}" \
-            --focus "${{ inputs.focus || '' }}"
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: >-
+            /pm-run
+            ${{ github.event_name == 'schedule' && 'schedule' || github.event_name }}
+            pm-${{ github.run_id }}
+            comment_id:${{ github.event.comment.id || '' }}
+            focus:${{ inputs.focus || '' }}
+          # Guardrails: scoped allowlist, turn cap, hard cost ceiling.
+          claude_args: |
+            --plugin-dir AgenticProjectManager
+            --allowedTools "Task,Read,Grep,Glob,Write,WebFetch,WebSearch,mcp__github,mcp__supabase"
+            --max-turns 150
+            --max-budget-usd 10

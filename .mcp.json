@@ -1,5 +1,5 @@
 {
-  "//": "PM tool surface when pm.tool_surface: mcp. ${VAR} values expand from the environment (.env locally, secrets in CI). GITHUB_MCP_TOKEN: a PAT with repo/issues scope — GitHub's hosted MCP endpoint does not accept the Actions-issued GITHUB_TOKEN. SUPABASE_ACCESS_TOKEN: a management PAT (sbp_...), not the service_role key.",
+  "//": "Plugin MCP servers. ${VAR} values expand from the environment (export locally or use bin/pm-local.*, which sources .env; Actions secrets in CI). GITHUB_MCP_TOKEN: a GitHub PAT with issues read/write — the hosted GitHub MCP does NOT accept the Actions-issued GITHUB_TOKEN. SUPABASE_ACCESS_TOKEN: a management PAT (sbp_...). Domain servers for consultants (e.g. an editor MCP) are added here by /tailor.",
   "mcpServers": {
     "github": {
       "type": "http",

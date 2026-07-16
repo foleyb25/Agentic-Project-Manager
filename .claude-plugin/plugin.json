@@ -1,0 +1,8 @@
+{
+  "name": "agentic-pm",
+  "version": "0.2.0",
+  "description": "Agentic project-manager pipeline: a PM run skill + spec-tailored advisory role agents, packaged as a Claude Code plugin. Load with --plugin-dir or install from a marketplace.",
+  "author": {
+    "name": "Brian Foley"
+  }
+}

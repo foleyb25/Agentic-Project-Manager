@@ -1,0 +1,16 @@
+{
+  "//": "Plugin guardrails. guard_sql.sh blocks destructive SQL (DDL, delete/truncate) from reaching the ledger via the supabase MCP — the PM protocol is upsert-only; PostgREST-era RLS no longer protects us because execute_sql runs as the management role.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__supabase__execute_sql",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/guard_sql.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}
