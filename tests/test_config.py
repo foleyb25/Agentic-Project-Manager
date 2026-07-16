@@ -19,6 +19,12 @@ SAMPLE = textwrap.dedent("""
       max_budget_usd: 5
     ledger:
       backend: jsonfile
+    pm:
+      tool_surface: mcp
+      mcp_config: mcp/pm.mcp.json
+      mcp_tools: [mcp__github, mcp__supabase]
+    consult:
+      mcp_config: mcp/consult.mcp.json
     roles:
       - name: qa
         title: QA
@@ -64,6 +70,17 @@ def test_roles_and_lookup(cfg):
 def test_routing_table_renders(cfg):
     md = cfg.routing_table_md()
     assert "`tests.*`" in md and "qa" in md and "ge" in md
+
+
+def test_tool_surface_and_mcp(cfg, tmp_path, monkeypatch):
+    assert cfg.pm_tool_surface == "mcp"
+    assert cfg.pm_mcp_config == "mcp/pm.mcp.json"
+    assert cfg.pm_mcp_tools == ["mcp__github", "mcp__supabase"]
+    assert cfg.consult_mcp_config == "mcp/consult.mcp.json"
+    monkeypatch.setenv("APM_TOOL_SURFACE", "cli")
+    from apm.config import load_config as lc
+
+    assert lc(tmp_path / "config" / "apm.yaml").pm_tool_surface == "cli"
 
 
 def test_env_override_backend(tmp_path, monkeypatch):

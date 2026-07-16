@@ -1,0 +1,23 @@
+{
+  "//": "PM tool surface when pm.tool_surface: mcp. ${VAR} values expand from the environment (.env locally, secrets in CI). GITHUB_MCP_TOKEN: a PAT with repo/issues scope — GitHub's hosted MCP endpoint does not accept the Actions-issued GITHUB_TOKEN. SUPABASE_ACCESS_TOKEN: a management PAT (sbp_...), not the service_role key.",
+  "mcpServers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_MCP_TOKEN}"
+      }
+    },
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref=${SUPABASE_PROJECT_REF}"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}"
+      }
+    }
+  }
+}

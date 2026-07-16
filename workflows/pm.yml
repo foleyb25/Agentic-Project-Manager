@@ -68,7 +68,14 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          # mcp tool surface (pm.tool_surface: mcp) — extra secrets:
+          # a PAT for the hosted GitHub MCP (Actions GITHUB_TOKEN won't auth it)
+          # and a Supabase management PAT + project ref for the Supabase MCP
+          GITHUB_MCP_TOKEN: ${{ secrets.GITHUB_MCP_TOKEN }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           # APM_LEDGER_BACKEND: jsonfile   # override without a config edit
+          # APM_TOOL_SURFACE: cli          # force surface without a config edit
         run: |
           uv sync --frozen
           uv run apm run \

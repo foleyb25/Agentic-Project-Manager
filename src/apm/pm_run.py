@@ -18,9 +18,8 @@ from .hashing import sha256_text
 from .ledger import make_ledger
 from .runner import make_runner
 
-# The PM's entire tool surface. Ledger writes go through `apm ledger` and
-# GitHub writes through `gh` — both auditable, both idempotent.
-PM_BASE_TOOLS = [
+# Core tools every PM run gets; the GitHub/ledger surface is config-chosen.
+PM_CORE_TOOLS = [
     "Task",
     "Read",
     "Grep",
@@ -28,6 +27,9 @@ PM_BASE_TOOLS = [
     "Write",
     "WebFetch",
     "WebSearch",
+]
+# cli surface: gh + apm ledger via Bash (hosts with gh installed, e.g. Actions)
+PM_CLI_TOOLS = [
     "Bash(gh issue:*)",
     "Bash(gh api:*)",
     "Bash(gh search:*)",
@@ -161,13 +163,43 @@ Consult with: `{cfg.apm_cmd} consult <role> "<feature.area>: <question>"`
 Routing table (feature area -> consultants):
 {cfg.routing_table_md()}
 
-## Ledger (backend: {cfg.ledger_backend})
+{_tool_surface_md(cfg)}
+"""
+
+
+def _tool_surface_md(cfg: Config) -> str:
+    if cfg.pm_tool_surface != "mcp":
+        return f"""## Tool surfaces (cli)
+GitHub: `gh` commands as shown in your charter.
+
+Ledger (backend: {cfg.ledger_backend}):
 - read:   `{cfg.apm_cmd} ledger get <table> key=value ...`
 - write:  `{cfg.apm_cmd} ledger upsert <table> '<json-row-or-array>'`
 - patch:  `{cfg.apm_cmd} ledger patch <table> key=value --data '<json>'`
 - hash:   `{cfg.apm_cmd} ledger hash --file <path>`
-Tables: comment_log, action_fingerprints, sync_cursor, ticket_log.
-"""
+Tables: comment_log, action_fingerprints, sync_cursor, ticket_log."""
+
+    return f"""## Tool surfaces (mcp) — overrides the concrete command examples in your charter
+GitHub: use the `github` MCP tools — `issue_write` (create/update issues,
+labels, milestone), `issue_read` (details/comments/labels), `add_issue_comment`
+(on-thread replies; its `reaction` parameter posts the 👀 processed-marker),
+plus list/search tools for dedup sweeps. Your charter's gh-command examples map
+1:1 onto these.
+
+Ledger: use the `supabase` MCP `execute_sql` tool. EVERY write must be an
+idempotent upsert. Primary keys: comment_log=comment_id,
+action_fingerprints=fingerprint, sync_cursor=scope, ticket_log=issue_number.
+- read:   select * from sync_cursor where scope = 'repo';
+- upsert (same pattern for every table — list all columns, update all
+  non-PK columns from excluded):
+    insert into sync_cursor (scope, last_seen_at)
+    values ('repo', '2026-01-01T00:00:00Z')
+    on conflict (scope) do update set last_seen_at = excluded.last_seen_at;
+- escape single quotes in text values by doubling them; pass jsonb columns as
+  '["#41"]'::jsonb.
+
+Content hashes (the one CLI helper you keep):
+`{cfg.apm_cmd} ledger hash --file <path>` or `--text "<fingerprint-key>"`."""
 
 
 def run_pm(
@@ -192,11 +224,20 @@ def run_pm(
     prompt = compose_prompt(cfg, context_path, ctx)
 
     apm_prefix = cfg.apm_cmd
-    allowed = PM_BASE_TOOLS + [f"Bash({apm_prefix}:*)"]
+    mcp_config = None
+    if cfg.pm_tool_surface == "mcp":
+        # MCP surface: GitHub + ledger via servers from pm_mcp_config; the only
+        # Bash grant left is the hash helper (part of this package, portable).
+        allowed = PM_CORE_TOOLS + cfg.pm_mcp_tools + [f"Bash({apm_prefix} ledger hash:*)"]
+        if cfg.pm_mcp_config:
+            mcp_config = cfg.repo_root / cfg.pm_mcp_config
+    else:
+        allowed = PM_CORE_TOOLS + PM_CLI_TOOLS + [f"Bash({apm_prefix}:*)"]
 
     if dry_run:
         print("=== apm run --dry-run ===")
-        print(f"engine: {cfg.engine} | cwd: {cfg.project_root}")
+        print(f"engine: {cfg.engine} | surface: {cfg.pm_tool_surface} | cwd: {cfg.project_root}")
+        print(f"mcp_config: {mcp_config}")
         print(f"allowedTools: {','.join(allowed)}")
         print(f"max_turns: {cfg.max_turns} | max_budget_usd: {cfg.max_budget_usd}")
         print("--- prompt ---")
@@ -211,6 +252,7 @@ def run_pm(
         max_turns=cfg.max_turns,
         max_budget_usd=cfg.max_budget_usd,
         model=cfg.pm_model,
+        mcp_config=mcp_config,
         cwd=cfg.project_root,
         capture=False,  # stream the PM's output into the console / CI log
     )

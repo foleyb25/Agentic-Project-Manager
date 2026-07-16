@@ -89,6 +89,11 @@ def _cmd_bootstrap(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Windows consoles default to legacy codepages; prompts contain emoji/UTF-8
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(prog="apm", description=__doc__)
     parser.add_argument("--config", help="path to apm.yaml (default: config/apm.yaml)")
     sub = parser.add_subparsers(dest="cmd", required=True)

@@ -39,6 +39,7 @@ class CliRunner:
         max_budget_usd: float | None = None,
         model: str | None = None,
         json_schema_file: str | Path | None = None,
+        mcp_config: str | Path | None = None,
         cwd: str | Path | None = None,
         capture: bool = True,
     ) -> RunnerResult:
@@ -47,7 +48,11 @@ class CliRunner:
             raise RunnerError(
                 "`claude` CLI not found — npm install -g @anthropic-ai/claude-code"
             )
+        # --strict-mcp-config: ONLY the servers we pass load; the project's own
+        # .mcp.json (e.g. an editor server meant for humans) never leaks in.
         cmd = [exe, "-p", prompt, "--strict-mcp-config"]
+        if mcp_config:
+            cmd += ["--mcp-config", str(mcp_config)]
         if system_prompt_file:
             cmd += ["--append-system-prompt-file", str(system_prompt_file)]
         if allowed_tools:
@@ -94,6 +99,7 @@ class SdkRunner:
         max_budget_usd: float | None = None,  # not enforced by SDK; documented
         model: str | None = None,
         json_schema_file: str | Path | None = None,
+        mcp_config: str | Path | None = None,
         cwd: str | Path | None = None,
         capture: bool = True,
     ) -> RunnerResult:
@@ -114,6 +120,14 @@ class SdkRunner:
                 "append": Path(system_prompt_file).read_text(encoding="utf-8"),
             }
 
+        mcp_servers = None
+        if mcp_config:
+            # NOTE: unlike the CLI, the SDK does not expand ${VAR} placeholders
+            # in server configs — use literal values or pre-expanded files here.
+            mcp_servers = json.loads(
+                Path(mcp_config).read_text(encoding="utf-8")
+            ).get("mcpServers", {})
+
         async def _run() -> tuple[int, str]:
             options = ClaudeAgentOptions(
                 system_prompt=system_prompt,
@@ -121,6 +135,7 @@ class SdkRunner:
                 max_turns=max_turns,
                 model=model,
                 cwd=str(cwd) if cwd else None,
+                mcp_servers=mcp_servers or {},
             )
             chunks: list[str] = []
             exit_code = 0

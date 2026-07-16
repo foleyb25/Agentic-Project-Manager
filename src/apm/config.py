@@ -57,6 +57,12 @@ class Config:
     routing: list[RoutingRule]
     labels: dict[str, list[str]]
     milestone: str | None
+    # Tool surfaces: 'cli' = gh + apm ledger via Bash; 'mcp' = GitHub/Supabase
+    # MCP servers from pm_mcp_config (portable — no host binaries assumed)
+    pm_tool_surface: str = "cli"
+    pm_mcp_config: str | None = None
+    pm_mcp_tools: list[str] = field(default_factory=list)
+    consult_mcp_config: str | None = None
     repo_root: Path = REPO_ROOT
 
     def role(self, name: str) -> Role | None:
@@ -103,6 +109,8 @@ def load_config(path: str | Path | None = None) -> Config:
     project = raw.get("project") or {}
     runner = raw.get("runner") or {}
     ledger = raw.get("ledger") or {}
+    pm = raw.get("pm") or {}
+    consult = raw.get("consult") or {}
     repo_root = cfg_path.resolve().parent.parent
 
     roles = [
@@ -150,5 +158,11 @@ def load_config(path: str | Path | None = None) -> Config:
         routing=routing,
         labels={k: list(v) for k, v in (raw.get("labels") or {}).items()},
         milestone=(raw.get("milestones") or {}).get("active"),
+        pm_tool_surface=os.environ.get(
+            "APM_TOOL_SURFACE", pm.get("tool_surface", "cli")
+        ),
+        pm_mcp_config=pm.get("mcp_config"),
+        pm_mcp_tools=list(pm.get("mcp_tools") or []),
+        consult_mcp_config=consult.get("mcp_config"),
         repo_root=repo_root,
     )

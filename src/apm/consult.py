@@ -41,6 +41,12 @@ Conventions doc: {cfg.conventions or "none"}
 Investigate per your charter (read code/config, research as needed) and return
 ONLY the JSON consultation report."""
 
+    # Domain MCP servers (e.g. an editor-embedded inspection server) load from
+    # consult.mcp_config; which tools a role may call still comes from its
+    # config extra_tools grants (mcp__<server>__<tool> entries).
+    mcp_config = (
+        cfg.repo_root / cfg.consult_mcp_config if cfg.consult_mcp_config else None
+    )
     runner = make_runner(cfg.engine)
     result = runner.run(
         prompt,
@@ -49,6 +55,7 @@ ONLY the JSON consultation report."""
         max_turns=cfg.consult_max_turns,
         model=role.model or cfg.consult_model,
         json_schema_file=cfg.repo_root / "schemas" / "consultation.json",
+        mcp_config=mcp_config,
         cwd=cfg.project_root,
         capture=True,
     )
