@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agentic-pm/consultation-report",
+  "title": "Consultation Report",
+  "description": "Structured report every advisory role agent returns to the PM. Consultants are advisory-only: this report is their entire output.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "role",
+    "topic",
+    "findings",
+    "approach",
+    "files_touched",
+    "risks",
+    "sequencing",
+    "suggested_acceptance_criteria"
+  ],
+  "properties": {
+    "role": {
+      "type": "string",
+      "description": "Configured role name of the consultant that produced this report (see config/apm.yaml roles)."
+    },
+    "topic": {
+      "type": "string",
+      "description": "The consultation question as understood, prefixed with its feature area (e.g. 'passing.lob: arc apex too high' or 'payroll.tax: multi-state withholding')."
+    },
+    "findings": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "What was learned from reading code/config and researching — facts with file/class/doc references, not opinions."
+    },
+    "approach": {
+      "type": "string",
+      "description": "Recommended approach, concrete enough for a developer ticket. Include rejected alternatives and why, one line each. Diagrams (Mermaid/text) go here."
+    },
+    "files_touched": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Repo/asset paths the recommended approach would create or modify. Empty if purely a design/process recommendation."
+    },
+    "risks": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Technical, scope, budget, or compliance risks — including anything that smells out-of-scope for the active version (flag for the PM's deferred protocol)."
+    },
+    "sequencing": {
+      "type": "string",
+      "description": "Dependency ordering: what must land before this, what this unblocks, what can parallelize."
+    },
+    "suggested_acceptance_criteria": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Verifiable ticket criteria tied to the active spec's targets / exit criteria."
+    },
+    "out_of_domain": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if this consultation was mis-routed ('this isn't my domain') — a routing bug the PM must fix."
+    }
+  }
+}

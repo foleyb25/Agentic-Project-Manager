@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+dist/
+*.egg-info/
+.pytest_cache/
+
+# APM runtime state (run contexts, comment bodies, jsonfile ledger)
+.apm/
+
+# Local agent/session state
+.claude/settings.local.json
+
+# Secrets
+.env
+.env.*

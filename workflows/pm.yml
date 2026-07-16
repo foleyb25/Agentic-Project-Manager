@@ -1,0 +1,79 @@
+# PM agent workflow — copy this file into YOUR PROJECT repo at
+# .github/workflows/pm.yml (the project that contains AgenticProjectManager
+# as a submodule). Secrets needed: ANTHROPIC_API_KEY, plus SUPABASE_URL +
+# SUPABASE_SERVICE_KEY for the supabase ledger backend.
+#
+# Comment bodies are never interpolated into shell/prompt text (the PM reads
+# them from the prefetched run context) — avoids prompt/shell injection.
+
+name: pm-agent
+
+on:
+  schedule:
+    - cron: "17 7 * * *" # nightly full loop
+  issue_comment:
+    types: [created, edited] # edited → content-hash re-analysis path
+  workflow_dispatch:
+    inputs:
+      focus:
+        description: "Optional focus note for this run"
+        required: false
+        default: ""
+
+# Two PM runs never overlap; a queued run still executes (cursor makes it cheap)
+concurrency:
+  group: pm-agent
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  pm:
+    # Event runs only fire for human @pm mentions; nightly sweep catches the rest
+    if: >-
+      github.event_name != 'issue_comment' ||
+      (contains(github.event.comment.body, '@pm') &&
+       github.event.comment.user.type != 'Bot')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive # pulls the pinned AgenticProjectManager (+ nested)
+          lfs: false # consultations read code, not binary assets
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install -g @anthropic-ai/claude-code
+
+      - uses: astral-sh/setup-uv@v5
+
+      # jsonfile ledger backend only: persist .apm/ across runs.
+      # (Delete this block when using the supabase backend.)
+      # - uses: actions/cache@v4
+      #   with:
+      #     path: AgenticProjectManager/.apm
+      #     key: apm-ledger-${{ github.run_id }}
+      #     restore-keys: apm-ledger-
+
+      - name: PM run
+        working-directory: AgenticProjectManager
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          # APM_LEDGER_BACKEND: jsonfile   # override without a config edit
+        run: |
+          uv sync --frozen
+          uv run apm run \
+            --trigger "${{ github.event_name == 'schedule' && 'schedule' || github.event_name == 'issue_comment' && 'issue_comment' || 'workflow_dispatch' }}" \
+            --run-id "pm-${{ github.run_id }}" \
+            --comment-id "${{ github.event.comment.id || '' }}" \
+            --issue-number "${{ github.event.issue.number || '' }}" \
+            --focus "${{ inputs.focus || '' }}"
